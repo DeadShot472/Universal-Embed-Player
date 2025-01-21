@@ -49,4 +49,4 @@ Once installed, the script will:
 
 ### Example:
 ```html
-<a href="https://teraboxapp.com/s/1tHzkFaTitu2T5y1RLV584A">Click here to view video</a>
+<a href="https://teraboxapp.com/s/1**********************">Click here to view video</a>
