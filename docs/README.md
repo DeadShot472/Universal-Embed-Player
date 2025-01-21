@@ -1,6 +1,3 @@
-# Universal-Embed-Player
-A flexible and customizable user script for embedding video players dynamically.
-
 # Universal Embed Player
 
 A flexible and customizable user script that dynamically embeds video players based on URL links on supported domains.
