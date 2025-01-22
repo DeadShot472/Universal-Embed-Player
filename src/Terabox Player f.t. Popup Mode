@@ -1,0 +1,292 @@
+// ==UserScript==
+// @name         Terabox Player f.t. Popup Mode
+// @namespace    http://tampermonkey.net/
+// @version      1.8
+// @description  Redirect Terabox links to the player website in an iframe popup with portrait and landscape mode toggles, and save popup position and size
+// @author       deadshot
+// @match        *://*/*
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    const SUPPORTED_DOMAINS = [
+        'terafileshare.com/s/',
+        'www.terabox.app/sharing/link',
+        'www.1024tera.com/sharing/link',
+        'teraboxlink.com/s/',
+        'terasharelink.com/s/'
+    ];
+
+    const log = (message) => console.log(`[Terabox Player] ${message}`);
+
+    const isSupportedUrl = (url) => SUPPORTED_DOMAINS.some(domain => url.includes(domain));
+
+    const createPopup = (id, embeddedUrl) => {
+        const popup = document.createElement('div');
+        popup.id = id;
+        popup.classList.add('terabox-popup');
+
+        // Set default dimensions or load from localStorage
+        const savedState = JSON.parse(localStorage.getItem('terabox-popup-state') || '{}');
+        const defaultWidth = '322px';
+        const defaultHeight = '546px';
+        popup.style.width = savedState.width || defaultWidth;
+        popup.style.height = savedState.height || defaultHeight;
+        popup.style.top = savedState.top || '50%';
+        popup.style.left = savedState.left || '50%';
+        popup.style.transform = savedState.transform || 'translate(-50%, -50%)';
+
+        // Header
+        const header = document.createElement('div');
+        header.classList.add('terabox-header');
+
+        const title = document.createElement('span');
+        title.textContent = 'Terabox Embedded Player';
+        title.classList.add('terabox-title');
+
+        const buttonContainer = document.createElement('div');
+
+        // Switch Mode Button
+        const switchModeButton = document.createElement('button');
+        switchModeButton.textContent = '⇔'; // Switch mode symbol
+        switchModeButton.classList.add('terabox-btn', 'switch-mode');
+        let isLandscape = false;
+
+        switchModeButton.addEventListener('click', () => {
+            if (isLandscape) {
+                // Switch to portrait
+                popup.style.width = '322px';
+                popup.style.height = '546px';
+                log('Switched to portrait mode.');
+            } else {
+                // Switch to landscape
+                popup.style.width = '684px';
+                popup.style.height = '414px';
+                log('Switched to landscape mode.');
+            }
+            isLandscape = !isLandscape;
+            savePopupState(); // Save the new state
+        });
+
+        // Minimize Button
+        const minimizeButton = document.createElement('button');
+        minimizeButton.textContent = '—';
+        minimizeButton.classList.add('terabox-btn', 'minimize');
+        minimizeButton.addEventListener('click', () => {
+            const iframe = popup.querySelector('iframe');
+            iframe.style.display = iframe.style.display === 'none' ? 'block' : 'none';
+            popup.style.height = iframe.style.display === 'none' ? 'auto' : popup.style.height;
+        });
+
+        // Close Button
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '✖';
+        closeButton.classList.add('terabox-btn', 'close');
+        closeButton.addEventListener('click', () => {
+            popup.remove();
+            localStorage.removeItem('terabox-popup-state'); // Remove state when closed
+        });
+
+        buttonContainer.append(switchModeButton, minimizeButton, closeButton);
+        header.append(title, buttonContainer);
+
+        // Iframe for Embedded URL
+        const iframe = document.createElement('iframe');
+        iframe.classList.add('terabox-iframe');
+        iframe.src = embeddedUrl;
+        iframe.style.display = 'none'; // Hide the iframe initially
+
+        popup.append(header, iframe);
+        document.body.appendChild(popup);
+
+        // Resizable Handle
+        const resizeHandle = document.createElement('div');
+        resizeHandle.classList.add('terabox-resize-handle');
+        popup.appendChild(resizeHandle);
+
+        let isResizing = false;
+        let startWidth, startHeight, startX, startY;
+
+        const onResizeMouseMove = (event) => {
+            if (isResizing) {
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                popup.style.width = `${startWidth + deltaX}px`;
+                popup.style.height = `${startHeight + deltaY}px`;
+                savePopupState(); // Save the new state during resizing
+            }
+        };
+
+        const onResizeMouseUp = () => {
+            if (isResizing) {
+                isResizing = false;
+                document.removeEventListener('mousemove', onResizeMouseMove);
+                document.removeEventListener('mouseup', onResizeMouseUp);
+                document.body.style.pointerEvents = 'auto';
+            }
+        };
+
+        resizeHandle.addEventListener('mousedown', (event) => {
+            isResizing = true;
+            startWidth = popup.offsetWidth;
+            startHeight = popup.offsetHeight;
+            startX = event.clientX;
+            startY = event.clientY;
+            document.addEventListener('mousemove', onResizeMouseMove);
+            document.addEventListener('mouseup', onResizeMouseUp);
+            document.body.style.pointerEvents = 'none';
+        });
+
+        // Draggable via header
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        const onMouseMove = (event) => {
+            if (isDragging) {
+                popup.style.left = `${event.clientX - offsetX}px`;
+                popup.style.top = `${event.clientY - offsetY}px`;
+                popup.style.transform = 'none';
+                savePopupState(); // Save the new position
+            }
+        };
+
+        const onMouseUp = () => {
+            isDragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        header.addEventListener('mousedown', (event) => {
+            isDragging = true;
+            offsetX = event.clientX - popup.getBoundingClientRect().left;
+            offsetY = event.clientY - popup.getBoundingClientRect().top;
+            popup.style.transition = 'none';
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        log('Popup created with portrait mode by default.');
+        return popup;
+    };
+
+    const savePopupState = () => {
+        const popup = document.querySelector('.terabox-popup');
+        if (popup) {
+            const popupState = {
+                width: popup.style.width,
+                height: popup.style.height,
+                top: popup.style.top,
+                left: popup.style.left,
+                transform: popup.style.transform,
+            };
+            localStorage.setItem('terabox-popup-state', JSON.stringify(popupState));
+        }
+    };
+
+    const openPopup = (url) => {
+        const id = `terabox-popup-${Date.now()}`;
+        const embeddedUrl = `https://www.terabox.tech/play.html?url=${encodeURIComponent(url)}`;
+        log(`Generating embedded player URL: ${embeddedUrl}`);
+        const popup = createPopup(id, embeddedUrl);
+        const iframe = popup.querySelector('iframe');
+
+        iframe.onload = () => {
+            iframe.style.display = 'block'; // Display iframe once it's loaded
+            log(`Embedded player loaded successfully.`);
+        };
+    };
+
+    const handleClick = (event) => {
+        const link = event.target.closest('a');
+        if (link && link.href && isSupportedUrl(link.href)) {
+            event.preventDefault();
+            openPopup(link.href);
+        }
+    };
+
+    document.addEventListener('click', handleClick, false);
+
+    // Add CSS for styles and animations
+    const style = document.createElement('style');
+    style.textContent = `
+        .terabox-popup {
+            position: fixed;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            overflow: hidden;
+            animation: popupFadeIn 0.3s;
+            min-width: 300px;
+            min-height: 200px;
+        }
+
+        .terabox-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background-color: #f1f1f1;
+            border-bottom: 1px solid #ddd;
+            cursor: move;
+        }
+
+        .terabox-title {
+            font-weight: bold;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .terabox-btn {
+            padding: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .terabox-btn.switch-mode {
+            margin-right: 5px;
+            background-color: #3498db; /* Blue */
+        }
+
+        .terabox-btn.minimize {
+            margin-right: 5px;
+            background-color: #f1c40f; /* Yellow */
+        }
+
+        .terabox-btn.close {
+            background-color: #f44336; /* Red */
+        }
+
+        .terabox-iframe {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .terabox-resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 15px;
+            height: 15px;
+            background-color: transparent;
+            cursor: se-resize;
+            z-index: 10001;
+        }
+
+        @keyframes popupFadeIn {
+            from { opacity: 0; transform: translate(-50%, -45%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+    `;
+    document.head.appendChild(style);
+})();
