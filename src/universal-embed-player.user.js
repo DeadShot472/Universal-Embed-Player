@@ -10,7 +10,7 @@
 // @connect      raw.githubusercontent.com
 // ==/UserScript==
 
-                                                 // Discussion : https://chatgpt.com/share/678f64dd-f128-8007-88b4-16134e8c0d5c
+// Discussion : https://chatgpt.com/share/678f64dd-f128-8007-88b4-16134e8c0d5c
 
 (function () {
     'use strict';
