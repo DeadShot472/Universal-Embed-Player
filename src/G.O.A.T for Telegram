@@ -1,0 +1,106 @@
+// ==UserScript==
+// @name         G.O.A.T for Telegram
+// @namespace    http://tampermonkey.net/
+// @version      0.9
+// @description  Embed a player for specific Terabox links, replacing media containers seamlessly
+// @author       DeadShot472
+// @match        *://*/*
+// @grant        GM_xmlhttpRequest
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // Configuration
+    const embedUrlBase = 'https://www.terabox.tech/play.html?url=';
+    const CONFIG_URL = 'https://raw.githubusercontent.com/DeadShot472/Universal-Embed-Player/refs/heads/main/config/allowed-domains.json'; // Corrected URL
+    let allowedDomains = [];
+
+    // Logging function
+    function log(message) {
+        console.log(`[Terabox Embed Generator] ${message}`);
+    }
+
+    // Fetch allowed domains from the GitHub JSON file
+    function fetchAllowedDomains() {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: CONFIG_URL,
+                onload: function (response) {
+                    try {
+                        const json = JSON.parse(response.responseText);
+                        allowedDomains = json.domains || [];
+                        resolve();
+                    } catch (e) {
+                        reject('Failed to load or parse allowed domains JSON');
+                    }
+                },
+                onerror: function () {
+                    reject('Error fetching allowed domains');
+                }
+            });
+        });
+    }
+
+    // Check if a URL matches any domain in the allowed domains list
+    function isAllowedDomain(url) {
+        try {
+            const domain = new URL(url).hostname.replace(/^www\./, '');
+            // Log the domain for debugging
+            log(`Checking domain: ${domain}`);
+            return allowedDomains.includes(domain);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    // Generate embed code for a given Terabox link
+    function createEmbedFrame(url, container) {
+        const embedUrl = `${embedUrlBase}${encodeURIComponent(url)}`;
+        const originalWidth = container.clientWidth;
+        const originalHeight = container.clientHeight;
+
+        // Clear the existing content
+        container.innerHTML = '';
+
+        // Add the iframe
+        const iframe = document.createElement('iframe');
+        iframe.src = embedUrl;
+        iframe.style.width = `${originalWidth}px`; // Match container width
+        iframe.style.height = `${originalHeight}px`; // Match container height
+        iframe.style.border = 'none'; // Remove iframe border
+        iframe.style.borderRadius = getComputedStyle(container).borderRadius; // Inherit rounded corners
+        iframe.style.boxShadow = getComputedStyle(container).boxShadow; // Inherit box shadow (if any)
+        iframe.allowFullscreen = true; // Allow fullscreen for better user experience
+
+        container.appendChild(iframe);
+        log('Embed frame added successfully.');
+    }
+
+    // Handle link click
+    document.addEventListener('click', function (event) {
+        const target = event.target.closest('a');
+        if (target && target.href && isAllowedDomain(target.href)) {
+            event.preventDefault(); // Prevent link from opening in new tab
+
+            const url = target.href;
+            log(`Clicked Terabox link: ${url}`);
+
+            // Find the closest media container to the link
+            const mediaContainer = target.closest('.bubble') ? target.closest('.bubble').querySelector('.media-container') : null;
+            if (mediaContainer) {
+                createEmbedFrame(url, mediaContainer); // Replace content with the embed frame
+            } else {
+                log('No media container found for the clicked link.');
+            }
+        }
+    }, false);
+
+    // Initialize the script by fetching allowed domains
+    fetchAllowedDomains().then(() => {
+        log('Allowed domains loaded successfully.');
+    }).catch((error) => {
+        log(error);
+    });
+})();
