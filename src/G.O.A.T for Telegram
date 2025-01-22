@@ -8,6 +8,8 @@
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
+                                //Discussion: https://chatgpt.com/share/679128f7-3b88-800c-9e53-31897701d2f9
+
 (function () {
     'use strict';
 
