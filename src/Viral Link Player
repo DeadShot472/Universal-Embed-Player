@@ -1,0 +1,106 @@
+// ==UserScript==
+// @name         Viral Link Player
+// @namespace    http://tampermonkey.net/
+// @version      2.1
+// @description  Generate and embed a video player on Terabox-supported sites with domain-specific logic.
+// @author       You
+// @match        https://teraboxviralvideo.link/*/*
+// @match        https://teraboxvideoplayer.one/*/*
+// @grant        none
+// ==/UserScript==
+
+                                                   //Discussion: https://chatgpt.com/share/6790bb8e-3d20-800c-8f18-2e44851f6055
+
+(function () {
+    'use strict';
+
+    const EMBED_URL_BASE = 'https://terabox-watch.netlify.app/api2.html?url=';
+
+    // Utility function for logging
+    const log = (message) => console.log(`[Embed Generator] ${message}`);
+
+    // Function to generate the iframe embed code
+    const generateEmbedCode = (url) => {
+        const embedUrl = `${EMBED_URL_BASE}${encodeURIComponent(url)}`;
+        return `<iframe src="${embedUrl}" width="700px" height="600px" frameborder="0" allowfullscreen scrolling="no"></iframe>`;
+    };
+
+    // Configuration for each domain
+    const DOMAIN_CONFIGS = {
+        "teraboxviralvideo.link": {
+            fetchVideoUrl: () => {
+                const mainContainer = document.getElementById('main-container');
+                if (!mainContainer) return log('Main container not found.');
+
+                const inputElement = mainContainer.querySelector('.custom-syntax-code');
+                if (!inputElement?.value) return log('Input element with URL not found.');
+
+                const videoUrl = inputElement.value.trim();
+                log(`Video URL extracted: ${videoUrl}`);
+                return videoUrl;
+            },
+            embedPlayer: (videoUrl) => {
+                const mainContainer = document.getElementById('main-container');
+                if (!mainContainer) return log('Main container not found.');
+
+                const targetImage = mainContainer.querySelector('div[style="text-align: center;"] img');
+                if (!targetImage) return log('Target image not found within the container.');
+
+                const embedDiv = document.createElement('div');
+                embedDiv.innerHTML = generateEmbedCode(videoUrl);
+                targetImage.replaceWith(embedDiv);
+
+                log('Player embedded successfully for teraboxviralvideo.link.');
+            },
+        },
+        "teraboxvideoplayer.one": {
+            fetchVideoUrl: () => {
+                const buttonDiv = document.querySelector('.wp-block-button');
+                if (!buttonDiv) return log('Button container not found.');
+
+                const linkElement = buttonDiv.querySelector('a[href*="?url="]');
+                if (!linkElement) return log('Video link not found.');
+
+                const urlMatch = linkElement.href.match(/url=([^&]+)/);
+                if (!urlMatch) return log('No valid URL found in href.');
+
+                // Extract the full URL from the `url` parameter
+                const videoUrl = decodeURIComponent(urlMatch[1]);
+                log(`Video URL extracted: ${videoUrl}`);
+                return videoUrl;
+            },
+            embedPlayer: (videoUrl) => {
+                const targetDiv = document.querySelector('div[style="text-align: center;"]');
+                if (!targetDiv) return log('Target container not found.');
+
+                const targetImage = targetDiv.querySelector('img');
+                if (!targetImage) return log('Target image not found.');
+
+                const embedDiv = document.createElement('div');
+                embedDiv.innerHTML = generateEmbedCode(videoUrl);
+                targetImage.replaceWith(embedDiv);
+
+                log('Player embedded successfully for teraboxvideoplayer.one.');
+            },
+        },
+    };
+
+    // Entry point: Detect domain and execute corresponding logic
+    const init = () => {
+        const hostname = window.location.hostname;
+        const domainConfig = DOMAIN_CONFIGS[hostname];
+
+        if (!domainConfig) {
+            return log(`No configuration found for domain: ${hostname}`);
+        }
+
+        log(`Detected domain: ${hostname}. Starting embed generation.`);
+        const videoUrl = domainConfig.fetchVideoUrl();
+        if (videoUrl) {
+            domainConfig.embedPlayer(videoUrl);
+        }
+    };
+
+    // Run the script after the page fully loads
+    window.addEventListener('load', init);
+})();
