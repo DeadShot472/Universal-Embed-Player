@@ -1,0 +1,88 @@
+// ==UserScript==
+// @name         Terabox Iframe Auto Open Optimized
+// @namespace    http://tampermonkey.net/
+// @version      2.0
+// @description  Automatically open the iframe video player in the current tab on teraboxplayer.online with optimized retry logic.
+// @author       Your Name
+// @match        https://www.teraboxplayer.online/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=teraboxplayer.online
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    console.log('Userscript active, monitoring for iframe elements...');
+
+    const RETRY_INTERVAL = 250; // Retry every 250ms
+    const MAX_RETRIES = 20; // Retry up to 20 times (5 seconds total)
+
+    // Function to handle redirection
+    function redirectToIframeSrc(iframeSrc) {
+        console.log(`Redirecting to: ${iframeSrc}`);
+        try {
+            window.location.assign(iframeSrc); // Explicit navigation to the iframe's URL
+        } catch (error) {
+            console.error(`Redirection failed: ${error}`);
+        }
+    }
+
+    // Function to retry fetching the iframe's src
+    function retryFetchIframeSrc(iframe, retries = 0) {
+        const iframeSrc = iframe.getAttribute('src');
+        if (iframeSrc) {
+            console.log(`Iframe src found: ${iframeSrc}`);
+            redirectToIframeSrc(iframeSrc);
+            return;
+        }
+        if (retries < MAX_RETRIES) {
+            setTimeout(() => retryFetchIframeSrc(iframe, retries + 1), RETRY_INTERVAL);
+        } else {
+            console.error('Failed to fetch iframe src after maximum retries.');
+        }
+    }
+
+    // Function to check for the iframe
+    function checkIframe(observer) {
+        const iframe = document.querySelector('#videoFrame');
+        if (iframe) {
+            observer.disconnect(); // Stop observing
+            retryFetchIframeSrc(iframe); // Retry fetching the iframe's src
+        }
+    }
+
+    // Monitor DOM for iframe
+    function monitorIframeElement() {
+        const observer = new MutationObserver(() => {
+            checkIframe(observer);
+        });
+
+        // Start observing the document
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Perform an initial check in case the iframe is already present
+        checkIframe(observer);
+    }
+
+    // Start monitoring after the page fully loads
+    window.addEventListener('load', () => {
+        console.log('Page loaded. Monitoring for iframe...');
+        monitorIframeElement();
+    });
+})();
+// ==UserScript==
+// @name         New Userscript
+// @namespace    http://tampermonkey.net/
+// @version      2025-01-16
+// @description  try to take over the world!
+// @author       You
+// @match        http://*/*
+// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Your code here...
+})();
