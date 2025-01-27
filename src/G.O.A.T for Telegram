@@ -1,21 +1,21 @@
 // ==UserScript==
 // @name         G.O.A.T for Telegram
 // @namespace    http://tampermonkey.net/
-// @version      0.9
-// @description  Embed a player for specific Terabox links, replacing media containers seamlessly
+// @version      1.0
+// @description  Embed a player for specific Terabox links, replacing media containers seamlessly on web.telegram.org
 // @author       DeadShot472
-// @match        *://*/*
+// @match        *://web.telegram.org/*
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
-                                //Discussion: https://chatgpt.com/share/679128f7-3b88-800c-9e53-31897701d2f9
+//Discussion: https://chatgpt.com/share/679731a4-a178-8007-a940-6adc62976154
 
 (function () {
     'use strict';
 
     // Configuration
     const embedUrlBase = 'https://www.terabox.tech/play.html?url=';
-    const CONFIG_URL = 'https://raw.githubusercontent.com/DeadShot472/Universal-Embed-Player/refs/heads/main/config/allowed-domains.json'; // Corrected URL
+    const CONFIG_URL = 'https://raw.githubusercontent.com/DeadShot472/Universal-Embed-Player/refs/heads/main/config/allowed-domains.json';
     let allowedDomains = [];
 
     // Logging function
@@ -35,6 +35,7 @@
                         allowedDomains = json.domains || [];
                         resolve();
                     } catch (e) {
+                        log(`Error parsing allowed domains: ${e.message}`);
                         reject('Failed to load or parse allowed domains JSON');
                     }
                 },
@@ -49,10 +50,10 @@
     function isAllowedDomain(url) {
         try {
             const domain = new URL(url).hostname.replace(/^www\./, '');
-            // Log the domain for debugging
             log(`Checking domain: ${domain}`);
             return allowedDomains.includes(domain);
         } catch (error) {
+            log(`Invalid URL: ${url}`);
             return false;
         }
     }
@@ -81,28 +82,41 @@
     }
 
     // Handle link click
-    document.addEventListener('click', function (event) {
-        const target = event.target.closest('a');
-        if (target && target.href && isAllowedDomain(target.href)) {
-            event.preventDefault(); // Prevent link from opening in new tab
+    document.addEventListener(
+        'click',
+        function (event) {
+            const target = event.target.closest('a');
+            if (target && target.href && isAllowedDomain(target.href)) {
+                // Prevent default action and stop event propagation
+                event.preventDefault();
+                event.stopImmediatePropagation();
 
-            const url = target.href;
-            log(`Clicked Terabox link: ${url}`);
+                const url = target.href;
+                log(`Clicked Terabox link: ${url}`);
 
-            // Find the closest media container to the link
-            const mediaContainer = target.closest('.bubble') ? target.closest('.bubble').querySelector('.media-container') : null;
-            if (mediaContainer) {
-                createEmbedFrame(url, mediaContainer); // Replace content with the embed frame
-            } else {
-                log('No media container found for the clicked link.');
+                // Find the closest media container
+                const mediaContainer = target.closest('.message-content-wrapper')
+                    ? target.closest('.message-content-wrapper').querySelector('.media-inner')
+                    : target.closest('.bubble')
+                    ? target.closest('.bubble').querySelector('.media-container')
+                    : null;
+
+                if (mediaContainer) {
+                    createEmbedFrame(url, mediaContainer); // Replace content with the embed frame
+                } else {
+                    log('No media container found for the clicked link.');
+                }
             }
-        }
-    }, false);
+        },
+        true // Use capturing phase to intercept events earlier
+    );
 
     // Initialize the script by fetching allowed domains
-    fetchAllowedDomains().then(() => {
-        log('Allowed domains loaded successfully.');
-    }).catch((error) => {
-        log(error);
-    });
+    fetchAllowedDomains()
+        .then(() => {
+            log('Allowed domains loaded successfully.');
+        })
+        .catch((error) => {
+            log(error);
+        });
 })();
